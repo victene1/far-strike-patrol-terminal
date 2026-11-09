@@ -26,6 +26,7 @@ input,textarea,button { font:inherit }
 input,textarea { width:100%; color:var(--ink); background:var(--bg); border:1px solid var(--line); padding:.65rem .75rem; border-radius:0 }
 textarea { min-height:5rem; resize:vertical }
 .short { width:8ch; text-transform:uppercase }
+.coordinate-code { margin:1.5rem 0; color:var(--accent); font-size:clamp(2rem,10vw,4rem); font-weight:bold; letter-spacing:.18em; text-align:center }
 :focus-visible { outline:2px solid var(--accent); outline-offset:3px }
 button { cursor:pointer; color:var(--ink); background:transparent; border:1px solid var(--line); padding:.45rem .85rem }
 button.primary { background:var(--accent); color:#102116; border-color:var(--accent); font-weight:bold }
@@ -69,7 +70,8 @@ const screens = [
   {title:'Password Section 2 · Relationship', body:operationalContext + '<p>How do these two USAF core functions work together?</p>', fields:[{id:'relationship',label:'Relationship',multiline:true}]},
   {title:'Question 3 of 3 · 3A', body:componentReference + '<p>Identify component A and state its function.</p>', response:'q3a', code:'3A'},
   {title:'Question 3 of 3 · 3B', body:componentReference + '<p>Identify component B and state its function.</p>', response:'q3b', code:'3B'},
-  {title:'Credential entry', body:'<p>Password order: 1, 2A, 2B, 3A, 3B.</p><p>Use uppercase letters and digits with no spaces.</p>', fields:[{id:'finalUser',label:'Username',pattern:'[a-z]+',hint:'Use lowercase letters without spaces.'},{id:'finalPass',label:'Password',pattern:'[A-Z0-9]{6}',hint:'Enter the six recovery characters in order.',max:6}]}
+  {title:'Credential entry', body:'<p>Password order: 1, 2A, 2B, 3A, 3B.</p><p>The verified username and assembled password are entered automatically.</p>', credentials:true, fields:[{id:'finalUser',label:'Username',pattern:'[a-z]+',hint:'Use lowercase letters without spaces.'},{id:'finalPass',label:'Password',pattern:'[A-Z0-9]{8}',hint:'Enter the eight recovery characters in order.',max:8}]},
+  {title:'Grid coordinate fragment', terminalCode:true}
 ];
 const byId = id => document.getElementById(id);
 const form = byId('terminal');
@@ -81,7 +83,8 @@ const receipt = byId('receipt');
 const feedback = byId('feedback');
 let step = 0;
 let entries = {};
-const credentialDigests = {"username":"1aff6f550e296873ecff4bc1889f4dc74a0350bf5d7d6471a469d05b76c0c967","code1":"b5b0d5b22cc7931445f387941a36978ae16d53f1e5831f6825a2b59e0e74a3cd","code2A":"ce4735485bff0272343170e8421d3af1e49aaac11aa7dcfe8b1872114853b031","code2B":"b4d57c031ae44f618ef3edb7eb025bb8431ad98da53365d98e12c5b8953f5766","code3A":"56233ee771e52f26a363f9e347b47c5dce37dc45555c3397080f08720017be66","code3B":"f1ec2ea88c47c13c2823c8a41c116c0f9b3678df57add2f3a550de40eeeb5b2e","finalUser":"acbc3f3094dd0e7a2fc53461ad0abd66b767b84f1b825649787badf1e6e10ada","finalPass":"c3e2a8faafe807d5cd7069b8a89a0e72600ea54bf165e0b4212103a7d485033a"};
+const recoveryCodeLengths = {'1':2,'2A':2,'2B':2,'3A':1,'3B':1};
+const credentialDigests = {"username":"1aff6f550e296873ecff4bc1889f4dc74a0350bf5d7d6471a469d05b76c0c967","code1":"b5b0d5b22cc7931445f387941a36978ae16d53f1e5831f6825a2b59e0e74a3cd","code2A":"e1955e5cc3e9f883ccafb5531867da3798d0050ae89a6d382782fd20e7ca4986","code2B":"130a3db9a4efd001c0caff27234f1b9c6bcfc2ed3c5205c8e03ec861960d42f9","code3A":"56233ee771e52f26a363f9e347b47c5dce37dc45555c3397080f08720017be66","code3B":"f1ec2ea88c47c13c2823c8a41c116c0f9b3678df57add2f3a550de40eeeb5b2e","finalUser":"acbc3f3094dd0e7a2fc53461ad0abd66b767b84f1b825649787badf1e6e10ada","finalPass":"ed562fe55db8c0637923612ea9820d9a9479896ea00e4cf9a95d4c69aef53beb"};
 async function matchesCredential(id, value) {
   const input = new TextEncoder().encode('far-strike:' + id + ':' + value);
   const hash = await crypto.subtle.digest('SHA-256', input);
@@ -92,7 +95,7 @@ async function matchesCredential(id, value) {
 
 function fieldList(screen) {
   if (screen.fields) return screen.fields;
-  const length = screen.code === '1' ? 2 : 1;
+  const length = recoveryCodeLengths[screen.code];
   return [
     {id:screen.response,label:'Response',multiline:true},
     {id:'code'+screen.code,label:'Recovery code '+screen.code,pattern:'[A-Za-z0-9]{'+length+'}',max:length,short:true,hint:'Enter '+length+' recovery '+(length===1?'character.':'characters.')}
@@ -116,11 +119,49 @@ function addField(field) {
   fields.append(label, input);
 }
 function capture() {
-  if (step >= screens.length) return;
+  if (step >= screens.length || screens[step].terminalCode) return;
   for (const field of fieldList(screens[step])) {
     const value = byId(field.id).value.trim();
     entries[field.id] = field.short ? value.toUpperCase() : value;
   }
+}
+function assembledPassword() {
+  return ['code1','code2A','code2B','code3A','code3B'].map(id => entries[id] || '').join('');
+}
+let gridCode = '';
+let countdownTimer = null;
+function showGridCoordinate() {
+  if (!gridCode) {
+    const randomValue = new Uint32Array(1);
+    crypto.getRandomValues(randomValue);
+    gridCode = String(randomValue[0] % 100000000).padStart(8, '0');
+  }
+  form.hidden = false;
+  receipt.hidden = true;
+  receipt.replaceChildren();
+  byId('step').textContent = 'ACCOUNT RECOVERY / SCREEN 9 OF 9';
+  title.textContent = 'Grid coordinate fragment';
+  fields.innerHTML = '<p>Write down this eight-digit grid coordinate fragment.</p><p class="coordinate-code" id="gridCode"></p><p id="countdown" role="status"></p>';
+  byId('gridCode').textContent = gridCode;
+  back.hidden = true;
+  next.hidden = true;
+  let remaining = 30;
+  byId('countdown').textContent = 'Terminal closes in ' + remaining + ' seconds.';
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = window.setInterval(() => {
+    remaining -= 1;
+    const countdown = byId('countdown');
+    if (countdown) countdown.textContent = 'Terminal closes in ' + remaining + ' seconds.';
+    if (remaining === 0) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      gridCode = '';
+      form.hidden = true;
+      receipt.hidden = false;
+      receipt.innerHTML = '<p>SESSION EXPIRED. Close this tab if your browser did not close it automatically.</p>';
+      window.close();
+    }
+  }, 1000);
 }
 function showReceipt() {
   title.textContent = 'Access Granted';
@@ -154,6 +195,12 @@ function render(focus = true) {
     form.hidden = false;
     byId('step').textContent = 'ACCOUNT RECOVERY / SCREEN ' + (step + 1) + ' OF ' + screens.length;
     title.textContent = screen.title;
+    if (screen.terminalCode) {
+      showGridCoordinate();
+      if (focus) title.focus();
+      return;
+    }
+    next.hidden = false;
     fields.innerHTML = screen.body;
     for (const field of fieldList(screen)) {
       if (field.short) {
@@ -164,15 +211,23 @@ function render(focus = true) {
       }
       addField(field);
     }
+    if (screen.credentials) {
+      entries.finalUser = entries.username || '';
+      entries.finalPass = assembledPassword();
+      byId('finalUser').value = entries.finalUser;
+      byId('finalPass').value = entries.finalPass;
+      byId('finalUser').readOnly = true;
+      byId('finalPass').readOnly = true;
+    }
     back.hidden = step === 0;
-    next.textContent = step === screens.length - 1 ? 'Submit credentials' : 'Continue';
+    next.textContent = screen.credentials ? 'Verify credentials' : 'Continue';
   }
   if (focus) title.focus();
 }
 let checking = false;
 form.addEventListener('submit', async event => {
   event.preventDefault();
-  if (checking || step >= screens.length) return;
+  if (checking || step >= screens.length || screens[step].terminalCode) return;
   feedback.textContent = '';
   capture();
   const screen = screens[step];
@@ -184,7 +239,7 @@ form.addEventListener('submit', async event => {
   }
   const checks = screen.code ? ['code' + screen.code]
     : step === 0 ? ['username']
-    : step === screens.length - 1 ? ['finalUser', 'finalPass']
+    : screen.credentials ? ['finalUser', 'finalPass']
     : [];
   if (checks.length) {
     checking = true;
@@ -213,6 +268,9 @@ form.addEventListener('submit', async event => {
 back.addEventListener('click', () => { if (checking) return; capture(); step -= 1; render(); });
 byId('reset').addEventListener('click', () => {
   if (checking || !window.confirm('Clear all entries and return to the first screen?')) return;
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = null;
+  gridCode = '';
   entries = {};
   step = 0;
   render();
