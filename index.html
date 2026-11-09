@@ -70,7 +70,7 @@ const screens = [
   {title:'Password Section 2 · Relationship', body:operationalContext + '<p>How do these two USAF core functions work together?</p>', fields:[{id:'relationship',label:'Relationship',multiline:true}]},
   {title:'Question 3 of 3 · 3A', body:componentReference + '<p>Identify component A and state its function.</p>', response:'q3a', code:'3A'},
   {title:'Question 3 of 3 · 3B', body:componentReference + '<p>Identify component B and state its function.</p>', response:'q3b', code:'3B'},
-  {title:'Credential entry', body:'<p>Password order: 1, 2A, 2B, 3A, 3B.</p><p>The verified username and assembled password are entered automatically.</p>', credentials:true, fields:[{id:'finalUser',label:'Username',pattern:'[a-z]+',hint:'Use lowercase letters without spaces.'},{id:'finalPass',label:'Password',pattern:'[A-Z0-9]{8}',hint:'Enter the eight recovery characters in order.',max:8}]},
+  {title:'Credential entry', body:'<p>Password order: 1, 2A, 2B, 3A, 3B.</p><p>The verified username and assembled password are entered automatically.</p>', credentials:true, fields:[{id:'finalUser',label:'Username',pattern:'[a-z]+',hint:'Use lowercase letters without spaces.'},{id:'finalPass',label:'Password',pattern:'[A-Z0-9]{6}',hint:'Enter the six recovery characters in order.',max:6}]},
   {title:'Grid coordinate fragment', terminalCode:true}
 ];
 const byId = id => document.getElementById(id);
@@ -83,8 +83,8 @@ const receipt = byId('receipt');
 const feedback = byId('feedback');
 let step = 0;
 let entries = {};
-const recoveryCodeLengths = {'1':2,'2A':2,'2B':2,'3A':1,'3B':1};
-const credentialDigests = {"username":"1aff6f550e296873ecff4bc1889f4dc74a0350bf5d7d6471a469d05b76c0c967","code1":"b5b0d5b22cc7931445f387941a36978ae16d53f1e5831f6825a2b59e0e74a3cd","code2A":"e1955e5cc3e9f883ccafb5531867da3798d0050ae89a6d382782fd20e7ca4986","code2B":"130a3db9a4efd001c0caff27234f1b9c6bcfc2ed3c5205c8e03ec861960d42f9","code3A":"56233ee771e52f26a363f9e347b47c5dce37dc45555c3397080f08720017be66","code3B":"f1ec2ea88c47c13c2823c8a41c116c0f9b3678df57add2f3a550de40eeeb5b2e","finalUser":"acbc3f3094dd0e7a2fc53461ad0abd66b767b84f1b825649787badf1e6e10ada","finalPass":"ed562fe55db8c0637923612ea9820d9a9479896ea00e4cf9a95d4c69aef53beb"};
+const recoveryCodeLengths = {'1':2,'2A':1,'2B':1,'3A':1,'3B':1};
+const credentialDigests = {"username":"1aff6f550e296873ecff4bc1889f4dc74a0350bf5d7d6471a469d05b76c0c967","code1":"b5b0d5b22cc7931445f387941a36978ae16d53f1e5831f6825a2b59e0e74a3cd","code2A":"ce4735485bff0272343170e8421d3af1e49aaac11aa7dcfe8b1872114853b031","code2B":"b4d57c031ae44f618ef3edb7eb025bb8431ad98da53365d98e12c5b8953f5766","code3A":"56233ee771e52f26a363f9e347b47c5dce37dc45555c3397080f08720017be66","code3B":"f1ec2ea88c47c13c2823c8a41c116c0f9b3678df57add2f3a550de40eeeb5b2e","finalUser":"acbc3f3094dd0e7a2fc53461ad0abd66b767b84f1b825649787badf1e6e10ada","finalPass":"c3e2a8faafe807d5cd7069b8a89a0e72600ea54bf165e0b4212103a7d485033a"};
 async function matchesCredential(id, value) {
   const input = new TextEncoder().encode('far-strike:' + id + ':' + value);
   const hash = await crypto.subtle.digest('SHA-256', input);
