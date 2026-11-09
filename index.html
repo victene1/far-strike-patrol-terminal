@@ -128,20 +128,15 @@ function capture() {
 function assembledPassword() {
   return ['code1','code2A','code2B','code3A','code3B'].map(id => entries[id] || '').join('');
 }
-let gridCode = '';
+const gridCode = 'Sector 4A Grid:817-269';
 let countdownTimer = null;
 function showGridCoordinate() {
-  if (!gridCode) {
-    const randomValue = new Uint32Array(1);
-    crypto.getRandomValues(randomValue);
-    gridCode = String(randomValue[0] % 100000000).padStart(8, '0');
-  }
   form.hidden = false;
   receipt.hidden = true;
   receipt.replaceChildren();
   byId('step').textContent = 'ACCOUNT RECOVERY / SCREEN 9 OF 9';
   title.textContent = 'Grid coordinate fragment';
-  fields.innerHTML = '<p>Write down this eight-digit grid coordinate fragment.</p><p class="coordinate-code" id="gridCode"></p><p id="countdown" role="status"></p>';
+  fields.innerHTML = '<p>Write down this grid coordinate fragment.</p><p class="coordinate-code" id="gridCode"></p><p id="countdown" role="status"></p>';
   byId('gridCode').textContent = gridCode;
   back.hidden = true;
   next.hidden = true;
@@ -155,7 +150,6 @@ function showGridCoordinate() {
     if (remaining === 0) {
       clearInterval(countdownTimer);
       countdownTimer = null;
-      gridCode = '';
       form.hidden = true;
       receipt.hidden = false;
       receipt.innerHTML = '<p>SESSION EXPIRED. Close this tab if your browser did not close it automatically.</p>';
@@ -270,7 +264,6 @@ byId('reset').addEventListener('click', () => {
   if (checking || !window.confirm('Clear all entries and return to the first screen?')) return;
   if (countdownTimer) clearInterval(countdownTimer);
   countdownTimer = null;
-  gridCode = '';
   entries = {};
   step = 0;
   render();
